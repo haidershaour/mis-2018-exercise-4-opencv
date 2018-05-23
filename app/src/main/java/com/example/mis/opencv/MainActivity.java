@@ -1,27 +1,25 @@
 package com.example.mis.opencv;
-
-
-import org.opencv.android.BaseLoaderCallback;
-import org.opencv.android.CameraBridgeViewBase.CvCameraViewFrame;
-import org.opencv.android.LoaderCallbackInterface;
-import org.opencv.android.OpenCVLoader;
-import org.opencv.core.Mat;
-import org.opencv.android.CameraBridgeViewBase;
-import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
-import org.opencv.core.Point;
-import org.opencv.core.Rect;
-import org.opencv.core.Scalar;
-import org.opencv.imgproc.Imgproc;
-
 import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.Menu;
 import android.view.MenuItem;
 import android.view.SurfaceView;
 import android.view.WindowManager;
 import android.widget.Toast;
-
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.CameraBridgeViewBase;
+import org.opencv.android.CameraBridgeViewBase.CvCameraViewFrame;
+import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
+import org.opencv.android.LoaderCallbackInterface;
+import org.opencv.android.OpenCVLoader;
+import org.opencv.core.Mat;
+import org.opencv.core.MatOfRect;
+import org.opencv.core.Point;
+import org.opencv.core.Rect;
+import org.opencv.core.Scalar;
+import org.opencv.core.Size;
+import org.opencv.imgproc.Imgproc;
+import org.opencv.objdetect.CascadeClassifier;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -30,10 +28,11 @@ import java.io.OutputStream;
 
 public class MainActivity extends Activity implements CvCameraViewListener2 {
     private static final String TAG = "OCVSample::Activity";
-
     private CameraBridgeViewBase mOpenCvCameraView;
     private boolean              mIsJavaCamera = true;
     private MenuItem             mItemSwitchCamera = null;
+    private CascadeClassifier cascadeFace;
+    Mat gray,col;
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -62,16 +61,13 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
         Log.i(TAG, "called onCreate");
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-
         setContentView(R.layout.activity_main);
-
         mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.tutorial1_activity_java_surface_view);
-
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
-
         mOpenCvCameraView.setCvCameraViewListener(this);
-    }
+        Toast.makeText(getApplicationContext(),"Please Turn Device to Landscape For Optimum Result",Toast.LENGTH_LONG).show();
 
+    }
     @Override
     public void onPause()
     {
@@ -79,7 +75,6 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
         if (mOpenCvCameraView != null)
             mOpenCvCameraView.disableView();
     }
-
     @Override
     public void onResume()
     {
@@ -92,39 +87,41 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
             mLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
         }
     }
-
     public void onDestroy() {
         super.onDestroy();
         if (mOpenCvCameraView != null)
             mOpenCvCameraView.disableView();
     }
-
     public void onCameraViewStarted(int width, int height) {
+        cascadeFace = new CascadeClassifier(initAssetFile("haarcascade_frontalface_default.xml"));
     }
 
     public void onCameraViewStopped() {
     }
 
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
+MatOfRect square = new MatOfRect();
+        double face = 65.0;
+        double width = 2/3 * face;
+        double height = face;
 
-        //return inputFrame.rgba();
-        /*
-        Mat col  = inputFrame.rgba();
-        Rect foo = new Rect(new Point(100,100), new Point(200,200));
-        Imgproc.rectangle(col, foo.tl(), foo.br(), new Scalar(0, 0, 255), 3);
-        return col;
-        */
+       gray = inputFrame.gray();
+       col  = inputFrame.rgba();
 
-        Mat gray = inputFrame.gray();
-        Mat col  = inputFrame.rgba();
+        cascadeFace.detectMultiScale( gray, square, 1.2, 6,0,
+                new Size(width, height), new Size(0, 0));
 
-        Mat tmp = gray.clone();
-        Imgproc.Canny(gray, tmp, 80, 100);
-        Imgproc.cvtColor(tmp, col, Imgproc.COLOR_GRAY2RGBA, 4);
-
+        for (Rect rect : square.toArray()) {
+            Imgproc.circle(
+                    col,
+                    new Point(rect.x + rect.width / 2, rect.y + rect.height / 1.65),
+                    rect.width / 7,
+                    new Scalar(500, 40, 40),
+                    -3
+            );
+        }
         return col;
     }
-
 
     public String initAssetFile(String filename)  {
         File file = new File(getFilesDir(), filename);
